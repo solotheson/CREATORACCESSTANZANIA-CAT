@@ -187,7 +187,8 @@ try {
   database=new DibDatabase(window.DIB_CONFIG);
   database.client.auth.onAuthStateChange((event,session)=>{
     if(event==='SIGNED_OUT')clearAccount();
-    else if(['INITIAL_SESSION','SIGNED_IN'].includes(event))setTimeout(()=>receiveSession(session),0);
+    // Only a successful login-form submission may open this page's account.
+    // Ignore restored sessions and sign-ins broadcast by another tab.
   });
   document.querySelector('#login-button').disabled=false;
   document.querySelector('#auth-status').textContent='Sign in with your DIB account.';
