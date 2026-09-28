@@ -17,11 +17,12 @@ window.DibDatabase = class {
     if (error) throw error;
     return data;
   }
-  async rows(table, key = 'id') {
+  async rows(table, key = 'id', owner = null) {
     const rows = [];
     // Keyset pagination avoids the API's default row limit.
     for (;;) {
       let query = this.client.from(table).select('*').order(key).limit(500);
+      if (owner) query = query.eq('created_by', owner);
       if (rows.length) query = query.gt(key, rows[rows.length - 1][key]);
       const page = await this.check(query);
       rows.push(...page);
@@ -33,9 +34,9 @@ window.DibDatabase = class {
     if (!member?.active || !['admin','user'].includes(member.role)) throw new Error('This account has no active DIB membership. Contact the project owner.');
     const admin = member.role === 'admin';
     const [stock, sales, costs, expenses, revenue, adjustments] = await Promise.all([
-      this.rows('dib_stock'), this.rows('dib_sales'),
+      this.rows('dib_stock'), this.rows('dib_sales', 'id', admin ? null : userId),
       admin ? this.rows('dib_purchase_costs', 'stock_id') : [],
-      admin ? this.rows('dib_expenses') : [], admin ? this.rows('dib_revenue') : [],
+      this.rows('dib_expenses', 'id', admin ? null : userId), admin ? this.rows('dib_revenue') : [],
       admin ? this.rows('dib_stock_adjustments') : []
     ]);
     const costMap = new Map(costs.map(c => [c.stock_id, c]));
@@ -51,6 +52,7 @@ window.DibDatabase = class {
   rpc(name, args) { return this.check(this.client.rpc(name, args)); }
   saveStock(id, item) { return this.rpc('dib_save_stock', {p_id:id,p_item:item}); }
   recordSale(id, sale) { return this.rpc('dib_record_sale', {p_id:id,p_stock_id:sale.stockId,p_quantity:sale.quantity,p_unit_price:sale.unitPrice,p_date:sale.date}); }
+  recordExpense(id, entry) { return this.rpc('dib_record_expense', {p_id:id,p_category:entry.category,p_note:entry.note,p_amount:entry.amount,p_date:entry.date}); }
   adjustStock(id, remaining, expected, reason) { return this.rpc('dib_adjust_stock', {p_stock_id:id,p_remaining:remaining,p_expected_remaining:expected,p_reason:reason}); }
   deleteStock(id) { return this.rpc('dib_delete_stock',{p_id:id}); }
   deleteSale(id) { return this.rpc('dib_delete_sale',{p_id:id}); }
