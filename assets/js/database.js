@@ -7,7 +7,10 @@ window.DibDatabase = class {
       try { if (JSON.parse(atob(config.publishableKey.split('.')[1])).role !== 'anon') throw new Error('Private key'); }
       catch { throw new Error('Use a publishable key or legacy anon key only.'); }
     }
-    this.client = supabase.createClient(config.url, config.publishableKey);
+    // Each page must sign in explicitly; never restore a browser or URL session.
+    this.client = supabase.createClient(config.url, config.publishableKey, {
+      auth: { persistSession: false, detectSessionInUrl: false, autoRefreshToken: true }
+    });
   }
   async check(request) {
     const {data, error} = await request;
