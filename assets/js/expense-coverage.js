@@ -15,8 +15,12 @@ window.coverageSummary = data => {
   // Assign rounding remainder to capital so both pools always sum to receipts.
   const capitalPool=Math.round((f.salesRevenue-profitPool)*100)/100;
   const profitRemaining=profitPool-totals.profit, capitalRemaining=capitalPool-totals.stock_capital;
+  const otherIncomeRemaining=f.otherIncome-totals.other_income;
+  const ownerCapitalRemaining=f.contributions-totals.owner_capital;
+  const borrowedRemaining=f.borrowed-totals.borrowed;
   return {...totals,assigned,unassigned:Math.max(0,f.expenseTotal-assigned+overAssigned),overAssigned,
     profitPool,capitalPool,profitRemaining,capitalRemaining,
+    otherIncomeRemaining,ownerCapitalRemaining,borrowedRemaining,
     salesRemaining:f.salesRevenue-totals.profit-totals.stock_capital,
-    needsReview:overAssigned>0.005||profitRemaining < -0.005||capitalRemaining < -0.005};
+    needsReview:overAssigned>0.005||profitRemaining < -0.005||capitalRemaining < -0.005||otherIncomeRemaining < -0.005||ownerCapitalRemaining < -0.005||borrowedRemaining < -0.005};
 };

@@ -20,6 +20,21 @@ test('other sources do not consume sales funds',()=>{
   const d=fixture();d.coverage=[{expense_id:'e',other_income:200000,owner_capital:300000,borrowed:200000}];
   const c=context.coverageSummary(d);assert.equal(c.salesRemaining,1500000);assert.equal(c.unassigned,0);
 });
+
+test('each funding source is reduced only by its saved expense allocation',()=>{
+  const d=fixture();d.revenue=[{amount:400000}];d.funding.push({type:'loan_received',amount:500000});
+  d.coverage=[{expense_id:'e',profit:100000,stock_capital:200000,other_income:150000,owner_capital:100000,borrowed:50000}];
+  const c=context.coverageSummary(d);
+  assert.equal(c.unassigned,100000);assert.equal(c.profitRemaining,400000);assert.equal(c.capitalRemaining,800000);
+  assert.equal(c.otherIncomeRemaining,250000);assert.equal(c.ownerCapitalRemaining,4900000);assert.equal(c.borrowedRemaining,450000);
+  assert.equal(c.needsReview,false);
+  d.coverage[0].other_income=500000;
+  assert.equal(context.coverageSummary(d).otherIncomeRemaining,-100000);
+  assert.equal(context.coverageSummary(d).needsReview,true);
+  d.expenses=[];
+  const removed=context.coverageSummary(d);
+  assert.equal(removed.otherIncomeRemaining,400000);assert.equal(removed.ownerCapitalRemaining,5000000);assert.equal(removed.borrowedRemaining,500000);
+});
 test('sales at a loss only recover the cash actually received',()=>{
   const d=fixture();d.sales[0].unitPrice=600000;
   const c=context.coverageSummary(d);assert.equal(c.profitPool,0);assert.equal(c.capitalPool,600000);assert.equal(c.salesRemaining,600000);

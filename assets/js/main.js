@@ -238,7 +238,10 @@ function coverageMetrics(){
     ['Expenses from sales profit',data.coverageAvailable?c.profit:null],['Expenses from recovered stock capital',data.coverageAvailable?c.stock_capital:null],
     ['Sales profit left after allocations',valid?c.profitRemaining:null],['Recovered stock capital left after allocations',valid?c.capitalRemaining:null],
     ['Sales receipts left after allocations',valid?c.salesRemaining:null],['Expenses from other income',data.coverageAvailable?c.other_income:null],
-    ['Expenses from owner capital',data.coverageAvailable?c.owner_capital:null],['Expenses from borrowed money',data.coverageAvailable?c.borrowed:null]
+    ['Expenses from owner capital',data.coverageAvailable?c.owner_capital:null],['Expenses from borrowed money',data.coverageAvailable?c.borrowed:null],
+    ['Other income left after allocations',data.coverageAvailable?c.otherIncomeRemaining:null],
+    ['Owner capital left after allocations',data.coverageAvailable&&data.financeAvailable?c.ownerCapitalRemaining:null],
+    ['Borrowed money left after allocations',data.coverageAvailable&&data.financeAvailable?c.borrowedRemaining:null]
   ];
 }
 function coverageExportRows(){return [['Expense coverage scope','Sources of already-paid expenses. Sales balances are before restocking, withdrawals and loan repayments.'],...coverageMetrics().map(([label,value])=>[label,value===null?'Unavailable':value])];}
@@ -248,7 +251,7 @@ function renderCoverageSummary(){
   const c=coverageSummary(data), f=financialSummary(data);
   document.querySelector('#coverage-status').textContent=!data.coverageAvailable?'Expense coverage requires the database update. Existing expense payments remain unchanged.':
     f.missingCosts?'Purchase costs are missing; sales balances are unavailable.':
-    c.needsReview?'Some allocations exceed their expense amount or current sales funds. Review coverage after any sale or purchase correction.':
+    c.needsReview?'Some allocations exceed their expense amount or recorded funding sources. Review coverage and check missing income, capital or loan records.':
     c.unassigned>0?`${fmt(c.unassigned)} of paid expenses still needs its source recorded. Sales balances are provisional until every expense is assigned.`:
     'Every paid expense has its source recorded. Coverage identifies payments; it does not deduct them again.';
   document.querySelector('#coverage-cards').innerHTML=coverageMetrics().map(([label,value])=>`<article class="report-card ${value!==null&&value<0?'negative':''}"><span>${label}</span><strong>${value===null?'Unavailable':fmt(value)}</strong></article>`).join('');
@@ -290,8 +293,17 @@ document.addEventListener('click',e=>{
   const button=e.target.closest('[data-expense-coverage]');if(button&&!busy)openExpenseCoverage(button.dataset.expenseCoverage);
 });
 function financeMetrics(){
-  const f=financialSummary(data), ready=data.financeAvailable&&f.hasCapital&&!f.missingCosts;
+  const f=financialSummary(data), c=coverageSummary(data), ready=data.financeAvailable&&f.hasCapital&&!f.missingCosts;
+  const covered=data.coverageAvailable, salesCovered=covered&&!f.missingCosts;
   return [
+    ['Expenses remaining to cover',covered?c.unassigned:null,'Paid expenses whose funding source is still unassigned; not unpaid bills'],
+    ['Expenses covered',covered?c.assigned:null,'Total amounts assigned through each expense’s Coverage form'],
+    ['Sales profit remaining',salesCovered?c.profitRemaining:null,`Sales profit less ${fmt(c.profit)} assigned to expenses`],
+    ['Recovered sold-stock capital remaining',salesCovered?c.capitalRemaining:null,`Cost portion of sales receipts less ${fmt(c.stock_capital)} assigned to expenses`],
+    ['Sales receipts remaining after coverage',salesCovered?c.salesRemaining:null,'Sales profit remaining + recovered sold-stock capital remaining'],
+    ['Other income remaining after coverage',covered?c.otherIncomeRemaining:null,`Other income less ${fmt(c.other_income)} assigned to expenses`],
+    ['Owner capital remaining after coverage',covered&&data.financeAvailable?c.ownerCapitalRemaining:null,`Owner contributions less ${fmt(c.owner_capital)} assigned to expenses; before purchases and withdrawals`],
+    ['Borrowed money remaining after coverage',covered&&data.financeAvailable?c.borrowedRemaining:null,`Loan receipts less ${fmt(c.borrowed)} assigned to expenses; before purchases and principal repayments`],
     ['Capital invested',data.financeAvailable?f.contributions:null,'All recorded owner contributions'],
     ['Owner withdrawals',data.financeAvailable?f.withdrawals:null,'Money taken out; not an expense'],
     ['Paid expenses',f.expenseTotal,'Already deducted once, including payments using capital'],
@@ -310,7 +322,7 @@ function renderFinances(){
   if(!isAdmin()){
     status.textContent='';cards.innerHTML='';document.querySelector('#funding-body').innerHTML='';return;
   }
-  const f=financialSummary(data), warnings=[];
+  const f=financialSummary(data), c=coverageSummary(data), warnings=[];
   if(!data.financeAvailable)warnings.push('Capital tracking is not available yet. The database update must be applied before recording funds.');
   else if(!f.hasCapital)warnings.push('Start by recording your initial capital and every later contribution. Cash and net worth will appear after your first capital entry.');
   else warnings.push('Based on all recorded transactions. Complete all historical capital, purchases, expenses, withdrawals and loans, then compare cash with your actual balances.');
@@ -318,6 +330,12 @@ function renderFinances(){
   if(data.financeAvailable&&f.hasCapital&&f.cash<0)warnings.push('Calculated cash is negative. Check for missing capital or loans, duplicate expenses, or incorrect purchases.');
   if(f.debt<0)warnings.push('Loan repayments exceed recorded borrowing. Add missing loan receipts or correct repayment entries.');
   if(f.missingCosts)warnings.push('Some purchase costs are missing. Cash and net worth are unavailable until costs are restored.');
+  if(!data.coverageAvailable)warnings.push('Expense coverage is unavailable; remaining source balances cannot be calculated.');
+  else {
+    if(c.unassigned>0.005)warnings.push(`${fmt(c.unassigned)} of paid expenses remains to cover. Open Coverage on each expense to assign its source.`);
+    if(c.needsReview)warnings.push('Review coverage: an expense or funding source is overallocated. Check missing funding records and corrected transactions.');
+    warnings.push('Source balances subtract saved expense coverage only. Purchases, withdrawals and loan repayments are reflected in Cash remaining. Net profit / loss deducts every expense once.');
+  }
   status.textContent=warnings.join(' ');
   cards.innerHTML=financeMetrics().map(([label,value,hint])=>`<article class="report-card ${value!==null&&value<0?'negative':''}"><span>${escapeHtml(label)}</span><strong>${value===null?'Not set up':fmt(value)}</strong><small>${escapeHtml(hint)}</small></article>`).join('');
   document.querySelectorAll('[data-open="funding-modal"]').forEach(b=>b.disabled=!data.financeAvailable);
