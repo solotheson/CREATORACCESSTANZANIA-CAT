@@ -47,3 +47,35 @@ test('personal expense RPC does not accept a caller-supplied owner',async()=>{
   assert.equal(calls[0].args.p_amount,10);
   assert.equal('created_by' in calls[0].args,false);
 });
+
+test('funding is admin-only and numeric amounts are mapped',async()=>{
+  const {db,calls}=setup({dib_members:[{id:'admin',role:'admin',active:true}],dib_funding:[{id:'f1',type:'contribution',amount:'123.45'}]});
+  const {data}=await db.load('admin');assert.equal(data.funding[0].amount,123.45);assert.equal(data.financeAvailable,true);assert.ok(calls.includes('dib_funding'));
+});
+test('admin loads numeric expense source amounts while staff never queries coverage',async()=>{
+  const {db}=setup({dib_members:[{id:'admin',role:'admin',active:true}],dib_expense_coverage:[{expense_id:'e',profit:'10.25',stock_capital:'20',other_income:'0',owner_capital:'0',borrowed:'0',revision:2}]});
+  const {data}=await db.load('admin');assert.equal(data.coverageAvailable,true);assert.equal(data.coverage[0].profit,10.25);
+  const staff=setup({dib_members:[{id:'staff',role:'user',active:true}]});
+  await staff.db.load('staff');assert.equal(staff.calls.includes('dib_expense_coverage'),false);
+});
+test('coverage save uses a revision and expected expense amount without recording another expense',async()=>{
+  const {db,calls}=setup();const values={profit:10,stock_capital:5,other_income:0,owner_capital:0,borrowed:0};
+  await db.saveCoverage('e',2,15,values);
+  assert.equal(calls.length,1);assert.equal(calls[0].name,'dib_set_expense_coverage');assert.equal(calls[0].args.p_expected_revision,2);assert.equal(calls[0].args.p_expected_amount,15);
+});
+test('missing coverage migration disables coverage; other errors propagate',async()=>{
+  const {db}=setup();db.rows=async()=>{throw {code:'PGRST205'}};
+  assert.equal((await db.loadCoverage()).coverageAvailable,false);
+  db.rows=async()=>{throw {code:'42501'}};await assert.rejects(db.loadCoverage(),e=>e.code==='42501');
+});
+test('missing finance migration is tolerated but network and permission failures propagate',async()=>{
+  const {db}=setup();
+  for(const code of ['42P01','PGRST205']){
+    db.rows=async()=>{throw {code}};
+    const result=await db.loadFunding();assert.equal(result.financeAvailable,false);assert.equal(result.funding.length,0);
+  }
+  for(const code of ['42501','NETWORK']){
+    db.rows=async()=>{throw {code}};
+    await assert.rejects(db.loadFunding(),e=>e.code===code);
+  }
+});

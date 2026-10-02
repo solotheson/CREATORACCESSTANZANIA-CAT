@@ -33,23 +33,43 @@ window.DibDatabase = class {
     const member = await this.check(this.client.from('dib_members').select('id,display_name,role,active').eq('id', userId).single());
     if (!member?.active || !['admin','user'].includes(member.role)) throw new Error('This account has no active DIB membership. Contact the project owner.');
     const admin = member.role === 'admin';
-    const [stock, sales, costs, expenses, revenue, adjustments] = await Promise.all([
+    const [stock, sales, costs, expenses, revenue, adjustments, finance, coverage] = await Promise.all([
       this.rows('dib_stock'), this.rows('dib_sales', 'id', admin ? null : userId),
       admin ? this.rows('dib_purchase_costs', 'stock_id') : [],
       this.rows('dib_expenses', 'id', admin ? null : userId), admin ? this.rows('dib_revenue') : [],
-      admin ? this.rows('dib_stock_adjustments') : []
+      admin ? this.rows('dib_stock_adjustments') : [],
+      admin ? this.loadFunding() : {funding:[],financeAvailable:false},
+      admin ? this.loadCoverage() : {coverage:[],coverageAvailable:false}
     ]);
     const costMap = new Map(costs.map(c => [c.stock_id, c]));
     return {member, data: {
       stock: stock.map(s => ({...s, sellingPrice: Number(s.selling_price),
-        buyingPrice: admin ? Number(costMap.get(s.id)?.buying_price || 0) : undefined,
-        transport: admin ? Number(costMap.get(s.id)?.transport || 0) : undefined})),
+        buyingPrice: admin && costMap.has(s.id) ? Number(costMap.get(s.id).buying_price) : undefined,
+        transport: admin && costMap.has(s.id) ? Number(costMap.get(s.id).transport) : undefined})),
       sales: sales.map(s => ({...s, stockId:s.stock_id, unitPrice:Number(s.unit_price)})),
       expenses: expenses.map(e => ({...e,amount:Number(e.amount)})),
-      revenue: revenue.map(r => ({...r,amount:Number(r.amount)})), adjustments
+      revenue: revenue.map(r => ({...r,amount:Number(r.amount)})), adjustments, ...finance, ...coverage
     }};
   }
+  async loadFunding() {
+    try { return {funding:(await this.rows('dib_funding')).map(f => ({...f,amount:Number(f.amount)})),financeAvailable:true}; }
+    catch(error) {
+      // An unapplied migration must not block existing stock/sales workflows.
+      if (['42P01','PGRST205'].includes(error.code)) return {funding:[],financeAvailable:false};
+      throw error;
+    }
+  }
   rpc(name, args) { return this.check(this.client.rpc(name, args)); }
+  async loadCoverage() {
+    try {
+      const rows=await this.rows('dib_expense_coverage','expense_id');
+      return {coverage:rows.map(r=>({...r,...Object.fromEntries(['profit','stock_capital','other_income','owner_capital','borrowed'].map(k=>[k,Number(r[k])]))})),coverageAvailable:true};
+    } catch(error) {
+      if(['42P01','PGRST205'].includes(error.code))return {coverage:[],coverageAvailable:false};
+      throw error;
+    }
+  }
+  saveCoverage(expenseId, revision, amount, values) { return this.rpc('dib_set_expense_coverage',{p_expense_id:expenseId,p_expected_revision:revision,p_expected_amount:amount,p_values:values}); }
   saveStock(id, item) { return this.rpc('dib_save_stock', {p_id:id,p_item:item}); }
   recordSale(id, sale) { return this.rpc('dib_record_sale', {p_id:id,p_stock_id:sale.stockId,p_quantity:sale.quantity,p_unit_price:sale.unitPrice,p_date:sale.date}); }
   recordExpense(id, entry) { return this.rpc('dib_record_expense', {p_id:id,p_category:entry.category,p_note:entry.note,p_amount:entry.amount,p_date:entry.date}); }
@@ -57,11 +77,11 @@ window.DibDatabase = class {
   deleteStock(id) { return this.rpc('dib_delete_stock',{p_id:id}); }
   deleteSale(id) { return this.rpc('dib_delete_sale',{p_id:id}); }
   saveEntry(table, id, values) {
-    if (!['dib_expenses','dib_revenue'].includes(table)) throw new Error('Invalid table');
+    if (!['dib_expenses','dib_revenue','dib_funding'].includes(table)) throw new Error('Invalid table');
     return this.check(this.client.from(table).upsert({id,...values}).select('id').single());
   }
   deleteEntry(table, id) {
-    if (!['dib_expenses','dib_revenue'].includes(table)) throw new Error('Invalid table');
+    if (!['dib_expenses','dib_revenue','dib_funding'].includes(table)) throw new Error('Invalid table');
     return this.check(this.client.from(table).delete().eq('id',id).select('id').single());
   }
 };
