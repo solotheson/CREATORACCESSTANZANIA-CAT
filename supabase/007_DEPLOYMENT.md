@@ -1,6 +1,6 @@
 # Manual expense coverage
 
-Prepared locally; migration and database permission checks have not been run on Supabase.
+Applied to the DIB production Supabase project on 2 October 2026. Transaction/rollback checks passed for Admin saves, exact retries, stale revisions, negative and overallocated amounts, staff denial, anonymous denial and row-level security. Test records were rolled back. See `tests/finance-access.sql`.
 
 Apply `007_expense_coverage.sql` after migrations 001–006, then publish the frontend. Until applied, the existing app works with coverage marked unavailable. Existing expenses retain their original amount and are initially unassigned; no funding source is inferred.
 
@@ -14,4 +14,4 @@ Server saves validate nonnegative finite amounts, two decimals, total <= expense
 
 Local checks: `node --test tests/*.test.cjs`. Browser fixture `/admin` verifies a 150 expense split as profit 95 and recovered capital 55: sales receipts left 50, net loss still 55. An attempted profit allocation of 96 is rejected. All fixtures are in memory and never contact Supabase.
 
-Before production release, run a transaction/rollback check in Supabase for Admin saves, exact retries, stale edits, invalid/overallocated amounts, and User/anonymous denial. Deploy database first, frontend second. The existing `006_business_finances.sql` update is also pending production application.
+Both migrations 006 and 007 are installed in production. The frontend was published on 2 October 2026 before database application and safely disabled the new controls until the tables became available. Repeat the transaction/rollback checks after future database changes.

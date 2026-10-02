@@ -1,6 +1,6 @@
 # Business position: capital and paid expenses
 
-Prepared locally. Migration and production verification have not been run.
+Applied to the DIB production Supabase project on 2 October 2026. Transaction/rollback checks passed for Admin funding writes and reads, staff denial, anonymous denial and row-level security. Test records were rolled back. See `tests/finance-access.sql`.
 
 1. Apply `006_business_finances.sql` to the existing Supabase project after migrations 001–005. It adds one admin-only funding table and does not modify existing records.
 2. Verify an Admin can create, read, edit and delete a test funding record. Verify User and anonymous roles cannot read or write funding, and inactive Admins are denied. Remove only the test records.
