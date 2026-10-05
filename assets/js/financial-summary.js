@@ -1,6 +1,6 @@
 'use strict';
 // All entries are paid immediately. Capital and loan principal are not income/expenses.
-window.financialSummary = data => {
+window.financialSummary = (data, actualCash = null) => {
   const current = rows => rows || [];
   const sum = (rows, value) => rows.reduce((n, r) => n + value(r), 0);
   const stock = current(data.stock), sales = current(data.sales);
@@ -20,10 +20,12 @@ window.financialSummary = data => {
   const borrowed = byType('loan_received'), repaid = byType('loan_repayment');
   const grossProfit = salesRevenue - soldCost;
   const netProfit = grossProfit + otherIncome - expenseTotal;
-  const cash = contributions + borrowed + salesRevenue + otherIncome - purchaseCost - expenseTotal - withdrawals - repaid;
+  const recordedCash = contributions + borrowed + salesRevenue + otherIncome - purchaseCost - expenseTotal - withdrawals - repaid;
+  const hasActualCash = Number.isFinite(actualCash) && actualCash >= 0 && actualCash < 1e14;
+  const cash = hasActualCash ? actualCash : recordedCash;
   const debt = borrowed - repaid;
   return {purchaseCost, salesRevenue, soldCost, inventory, adjustmentValue, expenseTotal, otherIncome,
-    contributions, withdrawals, borrowed, repaid, grossProfit, netProfit, cash, debt,
+    contributions, withdrawals, borrowed, repaid, grossProfit, netProfit, cash, debt, recordedCash, hasActualCash,
     netWorth: cash + inventory - debt,
     businessResult: netProfit + adjustmentValue,
     expensesBeyondEarnings: Math.max(0, expenseTotal - Math.max(0, grossProfit + otherIncome)),

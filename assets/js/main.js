@@ -1,6 +1,7 @@
 'use strict';
 let data={stock:[],sales:[],expenses:[],revenue:[],adjustments:[],funding:[],financeAvailable:false,coverage:[],coverageAvailable:false};
 let member=null, database=null, sessionUser=null, busy=false, loadGeneration=0;
+let actualCashBalance=null;
 const isAdmin=()=>member?.role==='admin';
 const businessDate=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Dar_es_Salaam',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const fmt=n=>new Intl.NumberFormat('en-TZ',{style:'currency',currency:'TZS',maximumFractionDigits:0}).format(Math.round(n||0));const number=n=>new Intl.NumberFormat('en-TZ').format(Math.round(n||0));const unitCost=s=>s.buyingPrice+(s.transport/s.quantity);const available=s=>s.quantity+(s.adjustment||0)-s.sold;const totalSales=()=>data.sales.reduce((sum,s)=>sum+s.quantity*s.unitPrice,0);const saleCost=s=>{const item=data.stock.find(x=>x.id===s.stockId);return item?unitCost(item)*s.quantity:0};const totalCostSold=()=>data.sales.reduce((sum,s)=>sum+saleCost(s),0);const totalExpenses=()=>data.expenses.reduce((sum,e)=>sum+e.amount,0);const grossProfit=()=>totalSales()-totalCostSold();const stockValue=()=>data.stock.reduce((sum,s)=>sum+available(s)*unitCost(s),0);const potentialProfit=()=>data.stock.reduce((sum,s)=>sum+available(s)*(s.sellingPrice-unitCost(s)),0);
@@ -28,6 +29,9 @@ function renderAll(){renderDashboard();renderInventory();renderSales();renderPur
 function clearAccount(message='Sign in with your DIB account.') {
   loadGeneration++;
   member=null; sessionUser=null;
+  actualCashBalance=null;
+  document.querySelector('#cash-balance-form').reset();
+  document.querySelector('#cash-balance-status').textContent='';
   data={stock:[],sales:[],expenses:[],revenue:[],adjustments:[],funding:[],financeAvailable:false,coverage:[],coverageAvailable:false};
   document.querySelectorAll('dialog[open]').forEach(d=>d.close());
   document.querySelectorAll('form').forEach(f=>{f.reset();delete f.dataset.recordId});
@@ -293,7 +297,7 @@ document.addEventListener('click',e=>{
   const button=e.target.closest('[data-expense-coverage]');if(button&&!busy)openExpenseCoverage(button.dataset.expenseCoverage);
 });
 function financeMetrics(){
-  const f=financialSummary(data), c=coverageSummary(data), ready=data.financeAvailable&&f.hasCapital&&!f.missingCosts;
+  const f=financialSummary(data,actualCashBalance), c=coverageSummary(data), ready=data.financeAvailable&&(f.hasCapital||f.hasActualCash)&&!f.missingCosts;
   const covered=data.coverageAvailable, salesCovered=covered&&!f.missingCosts;
   return [
     ['Expenses remaining to cover',covered?c.unassigned:null,'Paid expenses whose funding source is still unassigned; not unpaid bills'],
@@ -309,10 +313,10 @@ function financeMetrics(){
     ['Paid expenses',f.expenseTotal,'Already deducted once, including payments using capital'],
     ['Net profit / loss',f.missingCosts?null:f.netProfit,'Sales margin + other income − paid expenses'],
     ['Expenses beyond earnings',f.missingCosts?null:f.expensesBeyondEarnings,'Paid expenses exceeding positive sales margin and other income; funded by capital or borrowing'],
-    ['Cash remaining',ready?f.cash:null,'Combined cash, bank and mobile money'],
+    ['Cash remaining',f.hasActualCash?f.cash:ready?f.cash:null,f.hasActualCash?'Entered actual balance · session only':'Combined cash, bank and mobile money'],
     ['Stock at cost',f.missingCosts?null:f.inventory,'Remaining physical inventory'],
     ['Outstanding loan principal',data.financeAvailable?f.debt:null,'Loans received − principal repaid'],
-    ['Recorded net worth',ready?f.netWorth:null,'Cash + stock at cost − recorded loans'],
+    [f.hasActualCash?'Net worth using entered cash':'Recorded net worth',ready?f.netWorth:null,'Cash + stock at cost − recorded loans'],
     ['Stock adjustment value',f.missingCosts?null:f.adjustmentValue,'Inventory gains / losses; no cash movement'],
     ['Result including stock changes',f.missingCosts?null:f.businessResult,'Net profit / loss + stock adjustment value']
   ];
@@ -324,7 +328,8 @@ function renderFinances(){
   }
   const f=financialSummary(data), c=coverageSummary(data), warnings=[];
   if(!data.financeAvailable)warnings.push('Capital tracking is not available yet. The database update must be applied before recording funds.');
-  else if(!f.hasCapital)warnings.push('Start by recording your initial capital and every later contribution. Cash and net worth will appear after your first capital entry.');
+  else if(actualCashBalance!==null)warnings.push('Net worth uses your entered cash balance, current stock and recorded loans. Update cash after new activity; this balance is not saved.');
+  else if(!f.hasCapital)warnings.push('Enter actual cash above to calculate net worth, or record initial capital and every later contribution to calculate cash from transactions.');
   else warnings.push('Based on all recorded transactions. Complete all historical capital, purchases, expenses, withdrawals and loans, then compare cash with your actual balances.');
   if(f.legacyLoanExpenses)warnings.push(`${f.legacyLoanExpenses} old “Loan payment” expense(s) need review: profit is provisional until principal and interest are separated. Replace only the principal portion with a loan principal repayment; keep interest as an expense. Do not record the same payment twice.`);
   if(data.financeAvailable&&f.hasCapital&&f.cash<0)warnings.push('Calculated cash is negative. Check for missing capital or loans, duplicate expenses, or incorrect purchases.');
@@ -348,6 +353,20 @@ function financeExportRows(){
     ['Loan payment expenses requiring review',f.legacyLoanExpenses],
     ...financeMetrics().map(([label,value])=>[label,value===null?'Not set up':value])];
 }
+document.querySelector('#cash-balance-form').onsubmit=e=>{
+  e.preventDefault();if(!isAdmin()||!e.target.reportValidity())return;
+  const amount=Number(e.target.elements.amount.value);
+  if(!validAmount(amount)||Math.abs(amount*100-Math.round(amount*100))>0.001){toast('Enter a nonnegative cash balance with at most two decimals.');return}
+  actualCashBalance=amount;
+  document.querySelector('#cash-balance-status').textContent=`Using ${fmt(amount)} actual cash for this session. This balance is not saved.`;
+  renderFinances();
+};
+document.querySelector('#reset-cash-balance').onclick=()=>{
+  if(!isAdmin())return;
+  actualCashBalance=null;document.querySelector('#cash-balance-form').reset();
+  document.querySelector('#cash-balance-status').textContent='Using cash calculated from recorded transactions.';
+  renderFinances();
+};
 function prepareFundingForm(item=null){
   const form=document.querySelector('#funding-form');form.reset();editingFundingId=item?.id||null;
   delete form.dataset.recordId;

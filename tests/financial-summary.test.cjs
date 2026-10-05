@@ -41,3 +41,13 @@ test('expense funding gap never exceeds expenses when sales lose money',()=>{
   const d=fixture();d.sales[0].unitPrice=500000;
   const f=summary(d);assert.equal(f.netProfit,-1200000);assert.equal(f.expensesBeyondEarnings,700000);
 });
+test('entered cash calculates net worth without changing profit, capital or recorded cash',()=>{
+  const d=fixture();d.funding=[{type:'loan_received',amount:600000}];
+  const recorded=summary(d), actual=summary(d,900000);
+  assert.equal(actual.cash,900000);assert.equal(actual.netWorth,2300000);
+  assert.equal(actual.netProfit,recorded.netProfit);assert.equal(actual.contributions,0);
+  assert.equal(actual.recordedCash,recorded.cash);assert.equal(actual.hasActualCash,true);
+  assert.equal(summary(d,0).netWorth,1400000);
+  assert.equal(summary(d,null).hasActualCash,false);
+  for(const value of [-1,NaN,Infinity,1e14,'900000'])assert.equal(summary(d,value).cash,recorded.cash);
+});

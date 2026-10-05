@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/styles.css?v=20261002-balances1">
+  <link rel="stylesheet" href="assets/css/styles.css?v=20261005-cash1">
 </head>
 <body class="signed-out">
   <section id="auth-panel" class="auth-panel"><form id="login-form" class="panel auth-card">
@@ -46,6 +46,7 @@
     <section class="view" id="finances">
       <div class="page-actions"><div><p class="eyebrow">CAPITAL &amp; CASH</p><h2>Business position</h2><p>All recorded activity from the beginning. Sales, purchases and expenses are paid immediately.</p></div><button class="button primary" data-open="funding-modal">+ Record funds</button></div>
       <p id="finance-status" class="panel report-note" role="status"></p>
+      <article class="panel report-note"><form id="cash-balance-form"><h3>Enter actual cash remaining</h3><div class="form-grid"><label>Cash + bank + mobile money (TZS)<input id="actual-cash" name="amount" type="number" min="0" max="99999999999999.99" step="0.01" placeholder="Enter your current combined balance" required aria-describedby="cash-balance-hint"></label></div><p id="cash-balance-hint" class="form-hint">Use your actual balance to calculate net worth with current stock and recorded loans. This value is used for this session only and is not saved to the database. Include all outstanding loans in Record funds.</p><button class="button primary" type="submit">Calculate net worth</button> <button class="button ghost" type="button" id="reset-cash-balance">Use recorded cash</button><p id="cash-balance-status" class="form-hint" role="status"></p></form></article>
       <div class="report-grid" id="finance-cards"></div>
       <article class="panel report-note"><h3>How your money is calculated</h3><p>Cash = capital invested + loans received + sales + other income − purchases (including transport) − paid expenses − owner withdrawals − loan principal repaid.</p><p>Net profit = sales − cost of sold stock + other income − paid expenses. Paying an expense from capital still reduces profit once. Capital investments are not revenue; withdrawals and loan principal are not expenses.</p><p>Recorded net worth = cash + remaining stock at cost − outstanding loans. This covers recorded cash, stock and loans only; add any other assets or liabilities separately when assessing your full business value. Cash is combined across cash, bank and mobile money.</p><p>Record every capital contribution from the beginning, including capital used to buy your original stock. Do not add today’s cash as another contribution. Existing expenses are treated as already paid—do not enter them again.</p></article>
       <article class="panel table-panel finance-history"><div class="panel-head"><h2>Capital, withdrawals and loans</h2></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Note</th><th>Amount</th><th>Actions</th></tr></thead><tbody id="funding-body"></tbody></table></div></article>
@@ -72,10 +73,10 @@
   <div class="toast" id="toast" role="status"></div>
   <script src="assets/vendor/supabase.js"></script>
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/database.js?v=20261002-balances1"></script>
-  <script src="assets/js/personal-summary.js?v=20261002-balances1"></script>
-  <script src="assets/js/financial-summary.js?v=20261002-balances1"></script>
-  <script src="assets/js/expense-coverage.js?v=20261002-balances1"></script>
-  <script src="assets/js/main.js?v=20261002-balances1"></script>
+  <script src="assets/js/database.js?v=20261005-cash1"></script>
+  <script src="assets/js/personal-summary.js?v=20261005-cash1"></script>
+  <script src="assets/js/financial-summary.js?v=20261005-cash1"></script>
+  <script src="assets/js/expense-coverage.js?v=20261005-cash1"></script>
+  <script src="assets/js/main.js?v=20261005-cash1"></script>
 </body>
 </html>
