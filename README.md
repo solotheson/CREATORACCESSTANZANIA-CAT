@@ -46,3 +46,9 @@ Admins can track owner capital, withdrawals, borrowing and principal repayments 
 Apply [migration 006](supabase/006_DEPLOYMENT.md) and [migration 007](supabase/007_DEPLOYMENT.md) before using the new save controls. Without these database updates, existing stock and sales workflows remain available while funding and coverage controls are disabled. No historical capital or expense sources are inferred automatically.
 
 Run all local regression tests with `node --test tests/*.test.cjs`.
+
+## PDF reports
+
+Use **Inventory → Export PDF** to download product specifications, purchased/sold/adjusted/available quantities, prices and totals for the current search and stock filter. Staff exports omit purchase costs. Use **Business report → Export PDF** as an admin to download business totals, capital/cash/net worth and expense coverage, plus detailed inventory, sales, expenses, other revenue, funding and adjustment history. All reports include Tanzania generation time and page numbers. Entered actual cash is included when selected, with its session-only status explained.
+
+PDFs are generated in the browser using locally bundled jsPDF 4.2.1 and jsPDF-AutoTable 5.0.8 (MIT; licenses in `assets/vendor`). The libraries load only when exporting; no business records are sent to another service. CSV and JSON exports remain available.
